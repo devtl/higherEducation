@@ -1,0 +1,129 @@
+---
+title: "Project 2: US Higher Education Dataset"
+author: "Devin Luu"
+output:
+  html_notebook:
+    code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float: true
+runtime: shiny
+---
+```{r setup, include=FALSE}
+library(tidyverse)
+library(data.world)
+library(gridExtra)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## **R Session Info**  
+
+```{r}
+sessionInfo()
+```
+
+## **Github Link** 
+TBD
+
+## **Connecting to data.world** 
+```{r}
+project <- "https://data.world/devtl/f-17-edv-project-1"
+df <- data.world::query(data.world::qry_sql("SELECT * FROM clean_merged_university_data"), dataset = project)
+
+#df <- read_csv("Clean_merged_university_data.csv")
+```
+
+## **Introduction** 
+This is the notebook for Project 2 for Dr. Cannata's class CS 329E, Data Visualization. We will replicate the various plots in his Tableau overview in R and introduce basic elements of Shiny.
+
+We will be working with the [US Higher Education dataset](https://data.world/devtl/us-higher-education) on data.world to predict tuition prices across various factors.
+
+## Scatterplots
+
+Scatter and trend analysis for in-state tuition at various higher education institutions in the United States.
+
+```{r}
+inputPanel(
+  
+  checkboxGroupInput("state", label = "States:",
+                     choices = unique(df$state), selected = NULL, inline = TRUE
+  )
+)
+
+renderPlot({
+  
+  pl1 <- ggplot(
+    na.omit(df), 
+    mapping = aes(avg_sat_score, in_state_tuition)
+  ) + 
+    geom_point(size = 2, alpha = 0.33) + 
+    geom_smooth(method = "lm") + 
+    labs(x = "Avg SAT Score", y="In-state Tuition", title = "Nationwide Trend") +
+    theme_minimal()
+  
+  pl2 <- ggplot(
+    na.omit(subset(df, state %in% as.character(input$state))), 
+    mapping = aes(avg_sat_score, in_state_tuition, color = state)
+  ) + 
+    geom_point(size = 3, alpha = 0.33) + 
+    geom_smooth(method = "lm", se = FALSE) + 
+    labs(x = "Avg SAT Score", y="In-state Tuition", title = "Nationwide Trend") +
+    theme_minimal()
+  
+  grid.arrange(pl1, pl2, nrow=2)
+  
+})
+
+```
+
+## Barplots
+
+States arranged by highest average in-state tuition.
+
+```{r}
+renderPlot({
+  ggplot(na.omit(df), 
+         aes(
+           reorder(state, -in_state_tuition, function(x){mean(x)}), 
+           in_state_tuition)
+  )+ 
+    geom_bar(stat = "summary", fun.y=mean) +
+    labs(x = "Avg SAT Score", y="In-state Tuition", title = "Nationwide Trend") +
+    theme_minimal()
+  
+})
+```
+
+## Time Forecasts
+
+Here we look at yearly changes in average tuition and compare the nationwide average to individual states.
+
+```{r}
+inputPanel(
+  selectInput("state2", label = "States:",
+              choices = unique(df$state), selected = "AL")
+)
+
+renderPlot({
+  
+  pl3 <- ggplot(na.omit(df), mapping = aes(year, in_state_tuition)) + 
+    geom_point(stat = "summary", fun.y = mean, size = 2, alpha = 0.33) +
+    geom_line(stat = "summary", fun.y = mean, size = 2, alpha = 0.33) +
+    scale_x_continuous(breaks = seq(2003, 2014, by = 1)) + 
+    labs(x = "Year", y="In-state Tuition", title = "Nationwide Trend") + 
+    theme_minimal()
+  
+  pl4 <- ggplot(
+    na.omit(subset(df, state %in% as.character(input$state2))), 
+    mapping = aes(year, in_state_tuition)) + 
+    geom_point(stat = "summary", fun.y = mean, size = 2, alpha = 0.33) +
+    geom_line(stat = "summary", fun.y = mean, size = 2, alpha = 0.33) + 
+    scale_x_continuous(breaks = seq(2003, 2014, by = 1))  +
+    labs(x = "Year", y="In-state Tuition", title = "State Trend") + 
+    theme_minimal()
+  
+  grid.arrange(pl3, pl4, nrow=2)
+  
+})
+```
+
