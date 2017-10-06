@@ -13,6 +13,7 @@ runtime: shiny
 library(tidyverse)
 library(data.world)
 library(gridExtra)
+library(shiny)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -23,14 +24,15 @@ sessionInfo()
 ```
 
 ## **Github Link** 
-TBD
+(https://github.com/devtl/higherEducation)
 
 ## **Connecting to data.world** 
 ```{r}
 project <- "https://data.world/devtl/f-17-edv-project-1"
-df <- data.world::query(data.world::qry_sql("SELECT * FROM clean_merged_university_data"), dataset = project)
+df <- data.world::query(data.world::qry_sql("SELECT * FROM clean_merged_university_data LIMIT 1000"), dataset = project)
 
-#df <- read_csv("Clean_merged_university_data.csv")
+maxTuit <- max(df$in_state_tuition,na.rm = TRUE)
+
 ```
 
 ## **Introduction** 
@@ -45,9 +47,12 @@ Scatter and trend analysis for in-state tuition at various higher education inst
 ```{r}
 inputPanel(
   
-  checkboxGroupInput("state", label = "States:",
-                     choices = unique(df$state), selected = NULL, inline = TRUE
-  )
+  selectInput("state", label = "States:", multiple = TRUE,
+                     choices = unique(df$state), selected = "AL"),
+  sliderInput("tuitMin", label = "Select Minimum Tuition",
+              min = 0, max = maxTuit, value = 0, step = 100),
+  sliderInput("tuitMax", label = "Select Maximum Tuition",
+              min = 0, max = maxTuit, value = maxTuit, step = 100)
 )
 
 renderPlot({
@@ -67,13 +72,54 @@ renderPlot({
   ) + 
     geom_point(size = 3, alpha = 0.33) + 
     geom_smooth(method = "lm", se = FALSE) + 
-    labs(x = "Avg SAT Score", y="In-state Tuition", title = "Nationwide Trend") +
+    ylim(input$tuitMin, input$tuitMax) +
+    labs(x = "Avg SAT Score", y="In-state Tuition", title = "State Trends") +
     theme_minimal()
   
-  grid.arrange(pl1, pl2, nrow=2)
+  grid.arrange(pl1,pl2, nrow = 2)
   
 })
 
+```
+
+## Map Plot
+```{r}
+library(fiftystater)
+
+#Make Geolocation data frame with a quantitative variable
+mapdf <- aggregate(in_state_tuition ~ state, data = df, FUN = mean)
+repWith <- c("alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", 
+             "delaware", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa",
+             "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan",
+             "minnesota", "mississippi", "missouri", "montana", "nebraska", "nevada", "new hampshire", 
+             "new jersey","new mexico", "new york", "north carolina", "north dakota", "ohio", 
+             "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina", 
+             "south dakota", "tennessee", "texas", "utah", "vermont", "virginia", "washington", 
+             "west virginia", "wisconsin", "wyoming")
+rep <- c(
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
+  "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT",
+  "VA","WA","WV","WI","WY")
+
+rep <- tibble(state = rep, id = repWith)
+
+mapdf <- merge(mapdf,rep, by = "state")
+mapdf <- merge(mapdf,fifty_states, by = "id")
+
+data("fifty_states") # this line is optional due to lazy data loading
+
+# map_id creates the aesthetic mapping to the state name column in your data
+renderPlot({
+  ggplot(mapdf, aes(map_id = id)) + 
+  # map points to the fifty_states shape data
+  geom_map(aes(fill = in_state_tuition), map = fifty_states) + 
+  expand_limits(x = fifty_states$long, y = fifty_states$lat) +
+  coord_map() +
+  scale_x_continuous(breaks = NULL) + 
+  scale_y_continuous(breaks = NULL) +
+  theme_minimal()
+})
 ```
 
 ## Barplots
@@ -100,7 +146,7 @@ Here we look at yearly changes in average tuition and compare the nationwide ave
 
 ```{r}
 inputPanel(
-  selectInput("state2", label = "States:",
+  selectInput("state2", label = "States:", multiple = TRUE,
               choices = unique(df$state), selected = "AL")
 )
 
