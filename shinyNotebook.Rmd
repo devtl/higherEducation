@@ -16,6 +16,9 @@ library(tidyverse)
 library(data.world)
 library(gridExtra)
 library(shiny)
+library(fiftystater)
+library(mapproj)
+
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -32,7 +35,7 @@ sessionInfo()
 ```{r}
 project <- "https://data.world/devtl/f-17-edv-project-1"
 data.world::set_config(cfg_env("DW_API"))
-df <- data.world::query(data.world::qry_sql("SELECT * FROM clean_merged_university_data LIMIT 100"), dataset = project)
+df <- data.world::query(data.world::qry_sql("SELECT * FROM clean_merged_university_data"), dataset = project)
 
 maxTuit <- max(df$in_state_tuition,na.rm = TRUE)
 
@@ -87,8 +90,6 @@ renderPlot({
 
 ## Map Plot
 ```{r}
-library(fiftystater)
-
 #Make Geolocation data frame with a quantitative variable
 mapdf <- fifty_states
 inState <- aggregate(in_state_tuition ~ state, data = df, FUN = mean)
